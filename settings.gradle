@@ -1,0 +1,3 @@
+include ':materialseekbar'
+include ':app'
+rootProject.name = "MaterialSeekBar"
