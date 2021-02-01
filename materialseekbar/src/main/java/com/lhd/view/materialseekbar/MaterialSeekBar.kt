@@ -5,10 +5,12 @@ package com.lhd.view.materialseekbar
 
 import android.content.Context
 import android.graphics.*
+import android.graphics.drawable.ColorDrawable
 import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
 import android.view.ViewConfiguration
+import androidx.core.graphics.toRect
 import kotlin.math.*
 
 class MaterialSeekBar @JvmOverloads constructor(
@@ -52,6 +54,7 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     private var thumbSize = 0f
     private var thumbStrokeSize = 0f
+    private var thumbShadowRadius = 0f
 
     private var seekBarHeight = 0f
     private var seekBarProgressHeight = 0f
@@ -60,6 +63,10 @@ class MaterialSeekBar @JvmOverloads constructor(
     private var progressCornersRadius = 0f
 
     private var textIndicatorBottom = 0f
+
+    private var indicatorMode: IndicatorMode = IndicatorMode.ALWAYS_SHOW
+    private var indicatorFormat: IndicatorFormat = IndicatorFormat.FLOAT
+    private var indicatorScaleFloat = 1 //Number after dot with float value
 
     //===========================================================================
 
@@ -106,7 +113,7 @@ class MaterialSeekBar @JvmOverloads constructor(
                 ta.getColor(R.styleable.MaterialSeekBar_ms_thumb_stroke_color, Color.RED)
             paintThumbStroke.color =
                 ta.getColor(R.styleable.MaterialSeekBar_ms_thumb_color, Color.BLUE)
-            val thumbShadowRadius =
+            thumbShadowRadius =
                 ta.getDimension(R.styleable.MaterialSeekBar_ms_thumb_shadow_radius, 0f)
             val thumbShadowColor =
                 ta.getColor(R.styleable.MaterialSeekBar_ms_thumb_shadow_color, Color.BLACK)
@@ -137,8 +144,31 @@ class MaterialSeekBar @JvmOverloads constructor(
 
             paintTextIndicator.textSize =
                 ta.getDimension(R.styleable.MaterialSeekBar_ms_text_indicator_size, 0f)
+            paintTextIndicator.color =
+                ta.getColor(R.styleable.MaterialSeekBar_ms_text_indicator_color, Color.BLACK)
             textIndicatorBottom =
                 ta.getDimension(R.styleable.MaterialSeekBar_ms_text_indicator_bottom, 0f)
+            val textIndicatorValue = ta.getInt(
+                R.styleable.MaterialSeekBar_ms_indicator_mode,
+                IndicatorMode.ALWAYS_SHOW.value
+            )
+            indicatorMode = when (textIndicatorValue) {
+                IndicatorMode.HIDDEN.value -> IndicatorMode.HIDDEN
+                IndicatorMode.ONLY_FOCUS.value -> IndicatorMode.ONLY_FOCUS
+                else -> IndicatorMode.ALWAYS_SHOW
+            }
+            val indicatorFormatValue = ta.getInt(
+                R.styleable.MaterialSeekBar_ms_text_indicator_format,
+                IndicatorFormat.FLOAT.value
+            )
+            indicatorFormat = when (indicatorFormatValue) {
+                IndicatorFormat.INTEGER.value -> IndicatorFormat.INTEGER
+                else -> IndicatorFormat.FLOAT
+            }
+            indicatorScaleFloat =
+                ta.getInt(R.styleable.MaterialSeekBar_ms_text_indicator_float_scale_count, 1)
+            if (indicatorScaleFloat < 0)
+                indicatorScaleFloat = 1
 
             max = ta.getFloat(R.styleable.MaterialSeekBar_ms_max, 100f)
             progress = ta.getFloat(R.styleable.MaterialSeekBar_ms_progress, 0f)
@@ -149,10 +179,13 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val widthSize = MeasureSpec.getSize(widthMeasureSpec)
-        var minHeightForVisible = max(thumbSize, seekBarHeight).toInt() + paddingTop + paddingBottom
-        if (paintTextIndicator.textSize > 0) {
+        var minHeightForVisible = max(
+            thumbSize + thumbShadowRadius * 2,
+            seekBarHeight
+        ).toInt() + paddingTop + paddingBottom
+        if (paintTextIndicator.textSize > 0 && indicatorMode != IndicatorMode.HIDDEN) {
             paintTextIndicator.getTextBounds("1", 0, 1, rectTextIndicator)
-            minHeightForVisible += textIndicatorBottom.toInt() + rectTextIndicator.height() * 2 //+ getAdditionalPadding()
+            minHeightForVisible += textIndicatorBottom.toInt() + rectTextIndicator.height() //* 2 //+ getAdditionalPadding()
         }
         val resultHeight = measureDimension(
             minHeightForVisible,
@@ -178,19 +211,31 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         rectView.set(0f + paddingLeft, 0f + paddingTop, w - paddingRight, h - paddingBottom)
-        rectBackground.set(
-            rectView.left + thumbSize / 2f,
-            rectView.centerY() - seekBarHeight / 2f,
-            rectView.right - thumbSize / 2f,
-            rectView.centerY() + seekBarHeight / 2f
-        )
+        if (paintTextIndicator.textSize > 0f && indicatorMode != IndicatorMode.HIDDEN) {
+            val spaceBottomBar =
+                if (thumbSize + thumbShadowRadius * 2 > seekBarHeight) thumbSize / 2f + thumbShadowRadius else seekBarHeight / 2f
+            val barCenterY = rectView.bottom - spaceBottomBar
+            rectBackground.set(
+                rectView.left + thumbSize / 2f,
+                barCenterY - seekBarHeight / 2f,
+                rectView.right - thumbSize / 2f,
+                barCenterY + seekBarHeight / 2f
+            )
+        } else {
+            rectBackground.set(
+                rectView.left + thumbSize / 2f,
+                rectView.centerY() - seekBarHeight / 2f,
+                rectView.right - thumbSize / 2f,
+                rectView.centerY() + seekBarHeight / 2f
+            )
+        }
         rectProgress.set(rectBackground)
 
-        rectThumb.top = rectView.centerY() - thumbSize / 2f
-        rectThumb.bottom = rectView.centerY() + thumbSize / 2f
+        rectThumb.top = rectBackground.centerY() - thumbSize / 2f
+        rectThumb.bottom = rectBackground.centerY() + thumbSize / 2f
 
-        rectThumbStroke.top = rectView.centerY() - thumbStrokeSize / 2f
-        rectThumbStroke.bottom = rectView.centerY() + thumbStrokeSize / 2f
+        rectThumbStroke.top = rectBackground.centerY() - thumbStrokeSize / 2f
+        rectThumbStroke.bottom = rectBackground.centerY() + thumbStrokeSize / 2f
 
         invalidateThumbWithProgress()
         super.onSizeChanged(w, h, oldw, oldh)
@@ -203,6 +248,7 @@ class MaterialSeekBar @JvmOverloads constructor(
     }
 
     private fun drawView(canvas: Canvas) {
+
         canvas.drawLine(
             rectBackground.left,
             rectBackground.centerY(),
@@ -219,6 +265,26 @@ class MaterialSeekBar @JvmOverloads constructor(
         canvas.drawOval(rectThumb, paintThumb)
         if (thumbStrokeSize > 0)
             canvas.drawOval(rectThumbStroke, paintThumbStroke)
+
+        if (indicatorMode != IndicatorMode.HIDDEN) {
+            drawCurrentIndicatorValue(canvas)
+        }
+    }
+
+    private fun drawCurrentIndicatorValue(canvas: Canvas) {
+        val stringValue =
+            if (indicatorFormat == IndicatorFormat.INTEGER || indicatorScaleFloat == 0) {
+                "${progress.toInt()}"
+            } else {
+                "${progress.scale(indicatorScaleFloat)}"
+            }
+        paintTextIndicator.getTextBounds(stringValue, 0, stringValue.length - 1, rectTextIndicator)
+        canvas.drawText(
+            stringValue,
+            rectThumb.centerX(),
+            rectThumb.top - textIndicatorBottom - thumbShadowRadius,
+            paintTextIndicator
+        )
     }
 
     private fun invalidateThumbWithProgress() {
@@ -227,11 +293,6 @@ class MaterialSeekBar @JvmOverloads constructor(
         rectThumb.right = centerThumb + thumbSize / 2f
         rectThumbStroke.left = centerThumb - thumbStrokeSize / 2f
         rectThumbStroke.right = centerThumb + thumbStrokeSize / 2f
-    }
-
-    private fun invalidateProgressBarWithProgress() {
-        val centerThumb = progress.ProgressToPixelPosition()
-
     }
 
     //endregion
@@ -249,4 +310,15 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     //endregion
 
+    //region others
+
+    enum class IndicatorMode(var value: Int) {
+        HIDDEN(0), ONLY_FOCUS(1), ALWAYS_SHOW(2)
+    }
+
+    enum class IndicatorFormat(var value: Int) {
+        INTEGER(0), FLOAT(1)
+    }
+
+    //endregion
 }

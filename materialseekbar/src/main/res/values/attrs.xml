@@ -15,9 +15,20 @@
         <attr name="ms_thumb_shadow_radius" format="dimension" />
         <attr name="ms_thumb_shadow_color" format="color" />
 
+        <attr name="ms_text_indicator_font" format="reference" />
         <attr name="ms_text_indicator_size" format="dimension" />
         <attr name="ms_text_indicator_color" format="color" />
         <attr name="ms_text_indicator_bottom" format="color" />
+        <attr name="ms_text_indicator_format">
+            <enum name="integer_value" value="0" />
+            <enum name="float_value" value="1" />
+        </attr>
+        <attr name="ms_text_indicator_float_scale_count" format="integer" />
+        <attr name="ms_indicator_mode">
+            <enum name="hidden" value="0" />
+            <enum name="only_focus" value="1" />
+            <enum name="always_show" value="2" />
+        </attr>
 
         <attr name="ms_progress" format="float" />
         <attr name="ms_max" format="float" />
