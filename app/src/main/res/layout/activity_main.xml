@@ -7,17 +7,18 @@
     tools:context=".MainActivity">
 
     <com.lhd.view.materialseekbar.MaterialSeekBar
-        app:ms_text_indicator_size="16sp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:ms_progress="50.654127"
-        app:ms_text_indicator_format="float_value"
-        app:ms_text_indicator_float_scale_count="5"
+        app:ms_indicator_mode="always_show"
+        app:ms_progress="10"
         app:ms_seek_bar_stroke_size="2dp"
+        app:ms_text_indicator_float_scale_count="5"
+        app:ms_text_indicator_format="float_value"
+        app:ms_text_indicator_size="16sp"
         app:ms_thumb_shadow_radius="2dp"
         app:ms_thumb_stroke_size="8dp" />
 

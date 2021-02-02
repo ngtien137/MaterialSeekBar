@@ -3,14 +3,14 @@
  */
 package com.lhd.view.materialseekbar
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.ColorDrawable
 import android.text.TextPaint
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
-import androidx.core.graphics.toRect
 import kotlin.math.*
 
 class MaterialSeekBar @JvmOverloads constructor(
@@ -82,6 +82,8 @@ class MaterialSeekBar @JvmOverloads constructor(
     /**
      * Move value
      */
+    var isTouchingSeekBar = false
+        private set
     var isMovingThumb = false
         private set
     private val touchPointF = PointF()
@@ -90,6 +92,12 @@ class MaterialSeekBar @JvmOverloads constructor(
     }
 
     //===========================================================================
+
+    /**
+     * Listener
+     */
+
+    var listener: Listener? = null
 
     //region lifecycle
 
@@ -266,7 +274,7 @@ class MaterialSeekBar @JvmOverloads constructor(
         if (thumbStrokeSize > 0)
             canvas.drawOval(rectThumbStroke, paintThumbStroke)
 
-        if (indicatorMode != IndicatorMode.HIDDEN) {
+        if (indicatorMode == IndicatorMode.ALWAYS_SHOW || (indicatorMode == IndicatorMode.ONLY_FOCUS && isTouchingSeekBar)) {
             drawCurrentIndicatorValue(canvas)
         }
     }
@@ -279,9 +287,16 @@ class MaterialSeekBar @JvmOverloads constructor(
                 "${progress.scale(indicatorScaleFloat)}"
             }
         paintTextIndicator.getTextBounds(stringValue, 0, stringValue.length - 1, rectTextIndicator)
+        val minXText = rectBackground.left + rectTextIndicator.width() / 2f
+        val maxXText = rectBackground.right - rectTextIndicator.width() / 2f
+        val xText = when {
+            rectThumb.centerX() < minXText -> minXText
+            rectThumb.centerX() > maxXText -> maxXText
+            else -> rectThumb.centerX()
+        }
         canvas.drawText(
             stringValue,
-            rectThumb.centerX(),
+            xText,
             rectThumb.top - textIndicatorBottom - thumbShadowRadius,
             paintTextIndicator
         )
@@ -305,7 +320,70 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     private fun Number.ProgressToPixelPosition(): Float {
         val value = this.toFloat()
-        return (value / max) * getUsableSeekBarWidth() + getStartViewPixel()
+        val pixel = (value / max) * getUsableSeekBarWidth() + getStartViewPixel()
+        return when {
+            pixel < rectBackground.left -> rectBackground.left
+            pixel > rectBackground.right -> rectBackground.right
+            else -> pixel
+        }
+    }
+
+    private fun Number.PixelPositionToProgress(): Float {
+        val pixel = this.toFloat()
+        val progress = max * (pixel - rectView.left) / getUsableSeekBarWidth()
+        return when {
+            progress < 0 -> 0f
+            progress > max -> max
+            else -> progress
+        }
+    }
+
+    //endregion
+
+    //region touch
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        when (event?.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                isTouchingSeekBar = true
+                touchPointF.set(event.x, event.y)
+                progress = touchPointF.x.PixelPositionToProgress()
+                invalidateThumbWithProgress()
+                invalidate()
+                listener?.onStartTouch(progress)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                return if (isMovingThumb) {
+                    touchPointF.set(event.x, event.y)
+                    progress = touchPointF.x.PixelPositionToProgress()
+                    invalidateThumbWithProgress()
+                    invalidate()
+                    listener?.onProgressChanging(progress, Action.MOVING)
+                    true
+                } else {
+                    val disX = event.x - touchPointF.x
+                    if (abs(disX) >= touchSlop) {
+                        isMovingThumb = true
+                        listener?.onStartMove(progress)
+                        true
+                    } else
+                        false
+                }
+            }
+            MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_UP -> {
+                if (isMovingThumb) {
+                    isMovingThumb = false
+                } else {
+                    listener?.onTapToSeek(progress)
+                }
+                listener?.onEndTouch()
+                isTouchingSeekBar = false
+                invalidate()
+            }
+        }
+        return super.onTouchEvent(event)
     }
 
     //endregion
@@ -318,6 +396,44 @@ class MaterialSeekBar @JvmOverloads constructor(
 
     enum class IndicatorFormat(var value: Int) {
         INTEGER(0), FLOAT(1)
+    }
+
+    enum class Action {
+        NONE, MOVING
+    }
+
+    //endregion
+
+    //region listener
+
+    interface Listener {
+
+        fun onStartTouch(progress: Float) {}
+        fun onStartMove(progress: Float) {}
+        fun onTapToSeek(progress: Float)
+        fun onEndTouch() {}
+        fun onProgressChanging(progress: Float, action: Action)
+
+    }
+
+    //endregion
+
+    //region action
+
+    fun setProgress(progress: Number) {
+        val progressValue = progress.toFloat()
+        val p = if (progressValue < 0) 0 else if (progressValue > max) max else progressValue
+        this.progress = progressValue
+        invalidateThumbWithProgress()
+        invalidate()
+    }
+
+    fun setMax(max: Number) {
+        val maxValue = max.toFloat()
+        this.max = if (maxValue < 0) 0f else maxValue
+        this.progress = 0f
+        invalidateThumbWithProgress()
+        invalidate()
     }
 
     //endregion
